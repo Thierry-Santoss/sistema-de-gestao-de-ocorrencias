@@ -102,9 +102,11 @@ class OccurrenceController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $dispatch->update([
-            'status' => $request->status
-        ]);
+        if (!$dispatch->updateStatus($request->status)) {
+            return response()->json([
+                'error' => "Transição de status inválida: de {$dispatch->status} para {$request->status}."
+            ], 422);
+        }
 
         return response()->json([
             'message' => 'Status da viatura atualizado.',
