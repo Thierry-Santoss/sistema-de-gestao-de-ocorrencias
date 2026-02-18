@@ -18,59 +18,62 @@ class ProcessExternalOccurrence implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
-    
+
     public $backoff = [10, 30, 60];
 
     public $timeout = 60;
 
-    
     public function __construct(
         public EventInbox $event
-    ) {}
+    ) {
+    }
 
-    
     public function handle(): void
     {
-        $lock = Cache::lock('process_event_' . $this->event->id, 10);
-        if ($lock->get()) {
-            try {
-                if ($this->event->status === 'processed') {
-                    return;
-                }
+        $lockKey = 'process_event_' . $this->event->id;
+        $lock = Cache::lock($lockKey, 10);
 
-                DB::transaction(function () {
-                    $payload = $this->event->payload;
+        if (!$lock->get()) {
+            return;
+        }
 
-                    Occurrence::updateOrCreate(
-                        ['external_id' => $payload['externalId']],
-                        [
-                            'type' => $payload['type'],
-                            'description' => $payload['description'],
-                            'reported_at' => $payload['reportedAt'],
-                            'status' => 'reported',
-                        ]
-                    );
+        try {
+            if ($this->event->status === 'processed') {
+                return;
+            }
 
-                    $this->event->update([
-                        'status' => 'processed',
-                        'processed_at' => now(),
-                    ]);
-                    
-                    Log::info("Evento {$this->event->id} processado com sucesso.");
-                });
+            DB::transaction(function () {
+                $payload = $this->event->payload;
 
-            } catch (\Exception $e) {
+                Occurrence::updateOrCreate(
+                    ['external_id' => $payload['externalId']],
+                    [
+                        'type' => $payload['type'],
+                        'description' => $payload['description'],
+                        'reported_at' => $payload['reportedAt'],
+                        'status' => Occurrence::STATUS_REPORTED,
+                    ]
+                );
+
                 $this->event->update([
-                    'status' => 'failed',
-                    'error' => $e->getMessage()
+                    'status' => 'processed',
+                    'processed_at' => now(),
                 ]);
 
-                Log::error("Erro ao processar evento {$this->event->id}: " . $e->getMessage());
-                
-                throw $e; 
-            } finally {
-                $lock->release();
-            }
+                Log::info("Evento {$this->event->id} processado com sucesso.");
+            });
+
+        } catch (\Throwable $e) {
+            $this->event->update([
+                'status' => 'failed',
+                'error' => $e->getMessage(),
+            ]);
+
+            Log::error("Erro ao processar evento {$this->event->id}: " . $e->getMessage());
+
+            throw $e;
+        } finally {
+            $lock->release();
         }
     }
 }

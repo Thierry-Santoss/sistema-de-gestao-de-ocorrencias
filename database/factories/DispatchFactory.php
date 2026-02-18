@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Dispatch;
 use App\Models\Occurrence;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,7 +21,7 @@ class DispatchFactory extends Factory
         return [
             'occurrence_id' => Occurrence::factory(),
             'resource_code' => $this->faker->randomElement(['ABT-12', 'UR-05', 'ASU-02', 'AR-01']),
-            'status' => 'assigned',
+            'status' => Dispatch::STATUS_ASSIGNED,
         ];
     }
 }

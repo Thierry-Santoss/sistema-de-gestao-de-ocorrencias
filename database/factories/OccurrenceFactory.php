@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Occurrence;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -25,7 +26,7 @@ class OccurrenceFactory extends Factory
                 'salvamento_aquatico', 
                 'falso_chamado'
             ]),
-            'status' => 'reported',
+            'status' => Occurrence::STATUS_REPORTED,
             'description' => $this->faker->paragraph(),
             'reported_at' => now(),
         ];

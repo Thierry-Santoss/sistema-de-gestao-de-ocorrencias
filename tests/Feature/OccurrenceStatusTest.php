@@ -12,7 +12,7 @@ class OccurrenceStatusTest extends TestCase
 
     public function test_it_generates_audit_log_on_status_change()
     {
-        $occurrence = Occurrence::factory()->create(['status' => 'reported']);
+        $occurrence = Occurrence::factory()->create(['status' => Occurrence::STATUS_REPORTED]);
         
         $headers = ['X-API-Key' => config('app.api_key')];
 
@@ -29,8 +29,7 @@ class OccurrenceStatusTest extends TestCase
 
     public function test_it_prevents_invalid_status_transition()
     {
-        
-        $occurrence = Occurrence::factory()->create(['status' => 'reported']);
+        $occurrence = Occurrence::factory()->create(['status' => Occurrence::STATUS_REPORTED]);
         
         $headers = ['X-API-Key' => config('app.api_key')];
 

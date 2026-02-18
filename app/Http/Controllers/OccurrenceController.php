@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Dispatch;
 use App\Models\Occurrence;
 use Illuminate\Http\Request;
@@ -13,9 +12,9 @@ class OccurrenceController extends Controller
 {
     public function index(Request $request)
     {
-        $cacheKey = 'occurrences_' . md5(json_encode($request->all()));
+        $cacheKey = 'occurrences_p' . $request->input('page', 1) . '_' . md5(json_encode($request->all()));
 
-        return Cache::remember($cacheKey, 10, function () use ($request) {
+        return Cache::tags(['occurrences'])->remember($cacheKey, 3600, function () use ($request) {
             return Occurrence::query()
                 ->when($request->status, fn($q) => $q->where('status', $request->status))
                 ->when($request->type, fn($q) => $q->where('type', $request->type))
@@ -25,29 +24,29 @@ class OccurrenceController extends Controller
         });
     }
 
-    public function start($id)
+    public function start(string $id)
     {
         $occurrence = Occurrence::findOrFail($id);
 
-        if (!$occurrence->transitionTo('in_progress')) {
+        if (!$occurrence->transitionTo(Occurrence::STATUS_IN_PROGRESS)) {
             return response()->json(['error' => 'Transição de status inválida.'], 422);
         }
 
         return response()->json(['message' => 'Atendimento iniciado.', 'data' => $occurrence]);
     }
 
-    public function resolve($id)
+    public function resolve(string $id)
     {
         $occurrence = Occurrence::findOrFail($id);
 
-        if (!$occurrence->transitionTo('resolved')) {
+        if (!$occurrence->transitionTo(Occurrence::STATUS_RESOLVED)) {
             return response()->json(['error' => 'Não é possível resolver esta ocorrência.'], 422);
         }
 
         return response()->json(['message' => 'Ocorrência encerrada.']);
     }
 
-    public function addDispatch(Request $request, $id)
+    public function addDispatch(Request $request, string $id)
     {
         $occurrence = Occurrence::findOrFail($id);
 
@@ -57,16 +56,16 @@ class OccurrenceController extends Controller
 
         $dispatch = $occurrence->dispatches()->create([
             'resource_code' => $validated['resourceCode'],
-            'status' => 'assigned',
+            'status' => Dispatch::STATUS_ASSIGNED,
         ]);
 
         return response()->json([
             'message' => 'Viatura despachada com sucesso.',
-            'data' => $dispatch
+            'data' => $dispatch,
         ], 201);
     }
 
-    public function show($id)
+    public function show(string $id)
     {
         return Occurrence::with(['dispatches' => function ($q) {
             $q->latest();
@@ -78,15 +77,19 @@ class OccurrenceController extends Controller
         $occurrence = Occurrence::findOrFail($id);
 
         // Tentamos transitar para o estado 'cancelled'
-        if (!$occurrence->transitionTo('cancelled')) {
+        if (!$occurrence->transitionTo(Occurrence::STATUS_CANCELLED)) {
             return response()->json([
-                'message' => 'Não é possível cancelar uma ocorrência neste estado.'
+                'message' => 'Não é possível cancelar uma ocorrência neste estado.',
             ], 422);
         }
 
+        $occurrence->dispatches()
+            ->where('status', '!=', Dispatch::STATUS_CLOSED)
+            ->update(['status' => Dispatch::STATUS_CLOSED]);
+
         return response()->json([
             'message' => 'Ocorrência cancelada com sucesso.',
-            'status' => $occurrence->status
+            'status' => $occurrence->status,
         ]);
     }
 
@@ -104,13 +107,13 @@ class OccurrenceController extends Controller
 
         if (!$dispatch->updateStatus($request->status)) {
             return response()->json([
-                'error' => "Transição de status inválida: de {$dispatch->status} para {$request->status}."
+                'error' => "Transição de status inválida: de {$dispatch->status} para {$request->status}.",
             ], 422);
         }
 
         return response()->json([
             'message' => 'Status da viatura atualizado.',
-            'dispatch' => $dispatch
+            'dispatch' => $dispatch,
         ]);
     }
 }

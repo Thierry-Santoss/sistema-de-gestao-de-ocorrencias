@@ -19,7 +19,7 @@ class CheckApiKey
 
         if ($apiKey !== config('app.api_key')) {
             return response()->json([
-                'message' => 'Não autorizado: API Key inválida.'
+                'message' => 'Não autorizado: API Key inválida.',
             ], 401);
         }
 

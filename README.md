@@ -36,7 +36,7 @@ A infraestrutura é composta pelos seguintes serviços:
 
 ---
 
-## ⚙️ Setup do Ambiente (Task 01)
+## ⚙️ Setup do Ambiente
 
 ### 1️⃣ Pré-requisitos
 
@@ -47,17 +47,28 @@ A infraestrutura é composta pelos seguintes serviços:
 
 ---
 
+## 📊 Architecture Diagram
+
+![Project Architecture](./assets/Diagrama-Ocorrencias%20Diagrama.png)
+
+
+---
+
+### 🚦 Mapeamento de Portas e Serviços
+
+| Service | Host Port | Container Port (if Docker) | Source File |
+| :--- | :---: | :---: | :--- |
+| Laravel API (Nginx webserver) | `8000` | `80` | `docker-compose.yml` |
+| PostgreSQL | `5432` | `5432` | `docker-compose.yml` / `.env` |
+| Redis | `6379` | - | `.env` |
+| Vite Dev Server (assets) | `5173` | - | `package.json` (vite default) |
+
+---
+
 ### 2️⃣ Configuração
 
 ```bash
-cp .env.example .env
-```
-
-Configurações obrigatórias no `.env`:
-
-```
-DB_HOST=db
-REDIS_HOST=redis
+renomei .env.exemplo para .env
 ```
 
 ---
@@ -80,28 +91,23 @@ O comando:
 
 ```bash
 docker-compose exec app composer install
+```
+
+```bash
 docker-compose exec app php artisan key:generate
-docker-compose exec app chown -R www-data:www-data storage bootstrap/cache
-docker-compose exec app php artisan migrate
+```
+
+```bash
 docker-compose restart worker
 ```
 
----
-
-### 5️⃣ Observabilidade
-
-Monitoramento em tempo real:
-
 ```bash
-docker-compose logs -f
+docker-compose exec app chown -R www-data:www-data storage bootstrap/cache
 ```
 
-Logs críticos:
-
-* Execução do Worker
-* Conexão com Redis
-* Execução de migrations
-* Erros HTTP da API
+```bash
+docker-compose exec app php artisan migrate
+```
 
 ---
 
@@ -115,7 +121,7 @@ Logs críticos:
 
 ---
 
-## 🚀 Diferenciais Técnicos (Bônus)
+## 🚀 Diferenciais Técnicos
 
 * **Resiliência:** Retry automático com backoff exponencial para falhas de integração.
 * **Dead-Letter Queue:** Tratamento de falhas definitivas via tabela de `failed_jobs`.
@@ -131,9 +137,18 @@ Logs críticos:
 *Header:* `X-API-Key: sua_chave` | `Idempotency-Key: uuid`
 
 ### Fluxo Operacional
+**POST**
 * **Iniciar:** `/api/occurrences/{id}/start`
 * **Resolver:** `/api/occurrences/{id}/resolve`
+* **Cancelar:** `/api/occurrences/{id}/cancel`
 * **Despachar Viatura:** `/api/occurrences/{id}/dispatches`
+
+**PATCH**
+* **Atualizar Viatura:** `/api/dispatches/{{id}}/status`
+
+**GET**
+* **Listar Todas Viaturas:** `/api/occurrences`
+* **Listar Uma Viatura:** `/api/occurrences/{id}`
 
 ---
 

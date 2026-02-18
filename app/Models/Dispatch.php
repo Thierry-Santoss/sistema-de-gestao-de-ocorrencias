@@ -6,10 +6,16 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 
 class Dispatch extends Model
 {
     use HasUuids, HasFactory;
+
+    public const STATUS_ASSIGNED = 'assigned';
+    public const STATUS_EN_ROUTE = 'en_route';
+    public const STATUS_ON_SITE = 'on_site';
+    public const STATUS_CLOSED = 'closed';
 
     protected $fillable = [
         'occurrence_id',
@@ -25,10 +31,10 @@ class Dispatch extends Model
     public function updateStatus(string $newStatus): bool
     {
         $flow = [
-            'assigned' => ['en_route', 'closed'],
-            'en_route' => ['on_site', 'closed'],
-            'on_site'  => ['closed'],
-            'closed'   => []
+            self::STATUS_ASSIGNED => [self::STATUS_EN_ROUTE, self::STATUS_CLOSED],
+            self::STATUS_EN_ROUTE => [self::STATUS_ON_SITE, self::STATUS_CLOSED],
+            self::STATUS_ON_SITE  => [self::STATUS_CLOSED],
+            self::STATUS_CLOSED   => [],
         ];
 
         if (!in_array($newStatus, $flow[$this->status] ?? [])) {
@@ -36,5 +42,12 @@ class Dispatch extends Model
         }
 
         return $this->update(['status' => $newStatus]);
+    }
+
+    protected static function booted()
+    {
+        static::saved(function () {
+            Cache::tags(['occurrences'])->flush();
+        });
     }
 }

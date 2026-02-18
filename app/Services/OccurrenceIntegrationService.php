@@ -9,28 +9,28 @@ use Illuminate\Support\Str;
 
 class OccurrenceIntegrationService
 {
-  public function handle(array $data, string $idempotencyKey): string
-  {
-    $existingEvent = EventInbox::where('idempotency_key', $idempotencyKey)->first();
+    public function handle(array $data, string $idempotencyKey): EventInbox
+    {
+        $existingEvent = EventInbox::where('idempotency_key', $idempotencyKey)->first();
 
-    if ($existingEvent) {
-      return $existingEvent->id;
+        if ($existingEvent) {
+            return $existingEvent;
+        }
+
+        return DB::transaction(function () use ($data, $idempotencyKey) {
+            $newEvent = EventInbox::create([
+                'id' => Str::uuid(),
+                'idempotency_key' => $idempotencyKey,
+                'external_id' => $data['externalId'],
+                'source' => 'sistema_externo',
+                'type' => 'occurrence.created',
+                'payload' => $data,
+                'status' => 'pending',
+            ]);
+
+            ProcessExternalOccurrence::dispatch($newEvent);
+
+            return $newEvent;
+        });
     }
-
-    return DB::transaction(function () use ($data, $idempotencyKey) {
-      $event = EventInbox::create([
-        'id' => Str::uuid(),
-        'idempotency_key' => $idempotencyKey,
-        'external_id' => $data['externalId'],
-        'source' => 'sistema_externo',
-        'type' => 'occurrence.created',
-        'payload' => $data,
-        'status' => 'pending',
-      ]);
-
-      ProcessExternalOccurrence::dispatch($event);
-
-      return $event->id;
-    });
-  }
 }
